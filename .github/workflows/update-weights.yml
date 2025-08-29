@@ -1,0 +1,38 @@
+name: Update Lure Weights (monthly)
+
+on:
+  # Runs at 09:05 UTC on the 1st of every month
+  schedule:
+    - cron: '5 9 1 * *'
+  # Lets you run it manually from the Actions tab
+  workflow_dispatch: {}
+
+jobs:
+  call-update-weights:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Call Supabase Edge Function
+        env:
+          FUNCTION_URL: ${{ secrets.SUPABASE_FUNCTION_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          echo "::add-mask::$CRON_SECRET"
+          set -e
+          echo "Calling $FUNCTION_URL ..."
+          HTTP_CODE=$(curl -sS -o response.json -w "%{http_code}" -X POST "$FUNCTION_URL" \
+            -H "content-type: application/json" \
+            -H "x-cron-secret: $CRON_SECRET" \
+            --data '{}')
+          echo "HTTP $HTTP_CODE"
+          cat response.json || true
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            echo "Function call failed"
+            exit 1
+          fi
+
+      - name: Save response artifact (optional)
+        uses: actions/upload-artifact@v4
+        with:
+          name: update-weights-response
+          path: response.json
