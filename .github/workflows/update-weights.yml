@@ -1,38 +1,30 @@
 name: Update Lure Weights (monthly)
 
 on:
-  # Runs at 09:05 UTC on the 1st of every month
   schedule:
-    - cron: '5 9 1 * *'
-  # Lets you run it manually from the Actions tab
-  workflow_dispatch: {}
+    # 5:00 UTC on the 1st of every month
+    - cron: '0 5 1 * *'
+  workflow_dispatch:
 
 jobs:
   call-update-weights:
     runs-on: ubuntu-latest
-
     steps:
       - name: Call Supabase Edge Function
         env:
-          FUNCTION_URL: ${{ secrets.SUPABASE_FUNCTION_URL }}
+          FUNCTION_URL: ${{ secrets.SUPABASE_URL }}/functions/v1/update-weights
+          SR_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
+          # Hide secrets in logs
+          echo "::add-mask::$SR_KEY"
           echo "::add-mask::$CRON_SECRET"
-          set -e
-          echo "Calling $FUNCTION_URL ..."
-          HTTP_CODE=$(curl -sS -o response.json -w "%{http_code}" -X POST "$FUNCTION_URL" \
-            -H "content-type: application/json" \
-            -H "x-cron-secret: $CRON_SECRET" \
-            --data '{}')
-          echo "HTTP $HTTP_CODE"
-          cat response.json || true
-          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
-            echo "Function call failed"
-            exit 1
-          fi
 
-      - name: Save response artifact (optional)
-        uses: actions/upload-artifact@v4
-        with:
-          name: update-weights-response
-          path: response.json
+          # Call the function with BOTH required headers
+          curl -sS -X POST "$FUNCTION_URL" \
+            -H "Authorization: Bearer $SR_KEY" \
+            -H "x-cron-secret: $CRON_SECRET" \
+            -H "Content-Type: application/json" \
+            -d '{"name":"github"}' \
+            -w '\nHTTP %{http_code}\n' \
+            --fail
