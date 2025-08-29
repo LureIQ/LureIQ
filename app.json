@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "plugins": [
+      "expo-router"
+    ],
+    "experiments": { "typedRoutes": true },
+
+    "splash": {
+      "image": "./assets/images/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#87AFC7"
+    },
+
+    "ios": {
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "LureIQ uses your location to pull local weather and suggest the best lure."
+      }
+    }
+  }
+}
