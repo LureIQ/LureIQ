@@ -1,23 +1,46 @@
 name: Update Lure Weights (monthly)
 
 on:
+  schedule:
+    # 5:00 UTC on the 1st of every month
+    - cron: '0 5 1 * *'
   workflow_dispatch:
 
 jobs:
   call-update-weights:
     runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SR_KEY: ${{ secrets.SERVICE_ROLE_KEY }}
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      SUPABASE_FUNCTION_URL: ${{ secrets.SUPABASE_FUNCTION_URL }}
+
     steps:
       - name: Mask secrets in logs
         run: |
-          echo "::add-mask::${{ secrets.CRON_SECRET }}"
-          echo "::add-mask::${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
+          echo "::add-mask::${SR_KEY}"
+          echo "::add-mask::${CRON_SECRET}"
+
+      - name: Build function URL
+        id: build_url
+        run: |
+          if [ -n "${SUPABASE_FUNCTION_URL}" ]; then
+            FUNC_URL="${SUPABASE_FUNCTION_URL}"
+          else
+            if [ -z "${SUPABASE_URL}" ]; then
+              echo "Missing SUPABASE_URL or SUPABASE_FUNCTION_URL"; exit 1
+            fi
+            # Trim trailing slash if present, then append the function path
+            BASE="${SUPABASE_URL%/}"
+            FUNC_URL="${BASE}/functions/v1/update-weights"
+          fi
+          echo "FUNC_URL=${FUNC_URL}" >> $GITHUB_ENV
 
       - name: Call Supabase Edge Function
         run: |
           echo "Calling update-weights ..."
-          curl -sS -X POST \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
-            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+          curl -sS -X POST "$FUNC_URL" \
+            -H "Authorization: Bearer ${SR_KEY}" \
             -H "Content-Type: application/json" \
-            -d '{"name":"Actions"}' \
-            "${{ secrets.SUPABASE_URL }}/functions/v1/update-weights"
+            -H "x-cron-secret: ${CRON_SECRET}" \
+            --data '{"source":"github-actions"}'
