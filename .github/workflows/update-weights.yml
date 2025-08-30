@@ -1,30 +1,23 @@
 name: Update Lure Weights (monthly)
 
 on:
-  schedule:
-    # 5:00 UTC on the 1st of every month
-    - cron: '0 5 1 * *'
   workflow_dispatch:
 
 jobs:
   call-update-weights:
     runs-on: ubuntu-latest
     steps:
-      - name: Call Supabase Edge Function
-        env:
-          FUNCTION_URL: ${{ secrets.SUPABASE_URL }}/functions/v1/update-weights
-          SR_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      - name: Mask secrets in logs
         run: |
-          # Hide secrets in logs
-          echo "::add-mask::$SR_KEY"
-          echo "::add-mask::$CRON_SECRET"
+          echo "::add-mask::${{ secrets.CRON_SECRET }}"
+          echo "::add-mask::${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
 
-          # Call the function with BOTH required headers
-          curl -sS -X POST "$FUNCTION_URL" \
-            -H "Authorization: Bearer $SR_KEY" \
-            -H "x-cron-secret: $CRON_SECRET" \
+      - name: Call Supabase Edge Function
+        run: |
+          echo "Calling update-weights ..."
+          curl -sS -X POST \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
             -H "Content-Type: application/json" \
-            -d '{"name":"github"}' \
-            -w '\nHTTP %{http_code}\n' \
-            --fail
+            -d '{"name":"Actions"}' \
+            "${{ secrets.SUPABASE_URL }}/functions/v1/update-weights"
